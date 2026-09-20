@@ -25,8 +25,9 @@
   <nav class="tab-nav" aria-label="学習セクション">
     <button class="tab-btn is-active" data-tab="intro">はじめに</button>
     <button class="tab-btn" data-tab="parity">1. パリティチェック</button>
-    <button class="tab-btn" data-tab="checksum">2. チェックサム</button>
-    <button class="tab-btn" data-tab="crc">3. 巡回冗長検査(CRC)</button>
+    <button class="tab-btn" data-tab="hvparity">2. 水平垂直パリティ</button>
+    <button class="tab-btn" data-tab="checksum">3. チェックサム</button>
+    <button class="tab-btn" data-tab="crc">4. 巡回冗長検査(CRC)</button>
     <button class="tab-btn" data-tab="quiz">まとめクイズ</button>
   </nav>
 </header>
@@ -64,9 +65,10 @@
     </p>
 
     <div class="callout callout-idea">
-      <p class="callout-title">この教材で学ぶ3つの方式</p>
+      <p class="callout-title">この教材で学ぶ4つの方式</p>
       <ul>
         <li><strong>パリティチェック</strong> — 1の個数の偶奇だけを見る、もっとも単純な方法</li>
+        <li><strong>水平垂直パリティ</strong> — パリティチェックを行と列の2方向に広げ、誤りの位置まで特定する方法</li>
         <li><strong>チェックサム</strong> — データを数値の塊とみなして合計値を検査する方法</li>
         <li><strong>巡回冗長検査（CRC）</strong> — 割り算の余りを使う、実際の通信でも広く使われている方法</li>
       </ul>
@@ -139,13 +141,88 @@
     </div>
 
     <div class="section-nav">
+      <button class="btn btn-primary" data-goto="hvparity" type="button">次へ：水平垂直パリティ →</button>
+    </div>
+  </section>
+
+  <!-- ============ 2. 水平垂直パリティ ============ -->
+  <section class="panel" id="hvparity" data-section>
+    <p class="eyebrow">Step 2</p>
+    <h2 class="panel-title">水平垂直パリティ（2次元パリティ）</h2>
+    <p class="lead">
+      パリティチェックを1方向だけでなく、行（水平）と列（垂直）の2方向に広げる方法です。
+      データを表（マトリクス）の形に並べ、各行に1つ、各列に1つ、合計2種類のパリティビットを付け加えます。
+      これにより、誤りを検出できるだけでなく、多くの場合「どのビットが誤っているか」まで特定できるようになります。
+    </p>
+
+    <h3 class="sub-title">仕組み</h3>
+    <p>
+      たとえば4×4のデータを表の形に並べ、各行の右端にその行の偶数パリティビットを、各列の下端にその列の偶数パリティビットを付け加えます。
+      右下の角のビットは、パリティビットの行（または列）自身のパリティビットです。
+      受信側は届いた表に対して、すべての行とすべての列で「1の個数が偶数になっているか」を1つずつチェックします。
+      ちょうど1つの行とちょうど1つの列だけが不一致になっていれば、その行と列が交わるビットこそが誤りの場所だと特定できます。
+    </p>
+
+    <div class="widget" id="hvWidget">
+      <div class="widget-row">
+        <span class="widget-label">1. データ（4×4、クリックで0/1を切り替え）</span>
+        <div class="matrix" id="hvDataGrid"></div>
+      </div>
+
+      <div class="widget-row">
+        <span class="widget-label">2. 送信コードワード（行パリティ・列パリティを追加）</span>
+        <div class="signal-panel">
+          <div class="matrix" id="hvCodewordGrid"></div>
+          <p class="signal-panel__note">右端の列＝各行のパリティビット、下端の行＝各列のパリティビット、右下の角＝その両方のパリティビットです（Pのマーク）。</p>
+        </div>
+      </div>
+
+      <div class="widget-row">
+        <span class="widget-label">3. 受信データ（クリックしてビット誤りを再現）</span>
+        <div class="signal-panel">
+          <div class="matrix" id="hvReceivedGrid"></div>
+          <p class="signal-panel__hint">
+            マス（左側5×5）をクリックするとそのビットが反転します。右端と下端に並ぶ✓/✗は、各行・各列のパリティ検査の結果です。
+            ✗が1行と1列だけなら、その交点のビットをオレンジで表示します。
+          </p>
+        </div>
+      </div>
+
+      <div class="result-banner" id="hvResult" data-state="neutral">
+        <span class="result-banner__icon" aria-hidden="true">–</span>
+        <span class="result-banner__text">受信データのビットをクリックすると、判定結果がここに表示されます。</span>
+      </div>
+
+      <div class="widget-actions">
+        <button class="btn btn-secondary" id="hvReset" type="button">データを引き直す</button>
+        <button class="btn btn-secondary" id="hvRectangleDemo" type="button">四隅が同時に反転する例を見る</button>
+      </div>
+    </div>
+
+    <div class="callout callout-idea">
+      <p class="callout-title">水平垂直パリティが優れている点</p>
+      <p>
+        単純なパリティチェックは「誤りがあるらしい」ことしか分かりませんでしたが、水平垂直パリティでは行と列の両方をチェックすることで、
+        1ビットの誤りであれば<strong>その場所を特定し、値を訂正すること</strong>までできます。オレンジ色で示されたビットをもう一度クリックしてみましょう。
+      </p>
+    </div>
+
+    <div class="callout callout-warn">
+      <p class="callout-title">水平垂直パリティの弱点</p>
+      <p>
+        「四隅が同時に反転する例を見る」ボタンを押してみましょう。表の中の長方形の4つの角にあたる4ビットが同時に反転すると、
+        関係するすべての行・列でちょうど2ビットずつ変化するため、行・列のパリティチェックがすべて一致してしまい、<strong>誤りを完全に見逃してしまいます</strong>。
+      </p>
+    </div>
+
+    <div class="section-nav">
       <button class="btn btn-primary" data-goto="checksum" type="button">次へ：チェックサム →</button>
     </div>
   </section>
 
-  <!-- ============ 2. チェックサム ============ -->
+  <!-- ============ 3. チェックサム ============ -->
   <section class="panel" id="checksum" data-section>
-    <p class="eyebrow">Step 2</p>
+    <p class="eyebrow">Step 3</p>
     <h2 class="panel-title">チェックサム</h2>
     <p class="lead">
       データを一定のサイズ（ここでは8ビット＝0〜255の数値）ごとのブロックに分け、その合計値から検査用の数値「チェックサム」を作る方法です。
@@ -209,7 +286,7 @@
 
   <!-- ============ 3. CRC ============ -->
   <section class="panel" id="crc" data-section>
-    <p class="eyebrow">Step 3</p>
+    <p class="eyebrow">Step 4</p>
     <h2 class="panel-title">巡回冗長検査（CRC）</h2>
     <p class="lead">
       CRCは、データのビット列を1つの大きな2進数とみなし、あらかじめ決めておいた「生成多項式（割る数）」で割り算をして、

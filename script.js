@@ -247,7 +247,238 @@ function initParity() {
 }
 
 /* ============================================================
-   2. チェックサム
+   2. 水平垂直パリティ（2次元パリティ）
+   ============================================================ */
+
+function initHVParity() {
+  const SIZE = 4;
+
+  let dataMatrix = randomMatrix(SIZE);
+  let receivedGrid = null;
+
+  const dataGridEl = document.getElementById('hvDataGrid');
+  const codewordGridEl = document.getElementById('hvCodewordGrid');
+  const receivedGridEl = document.getElementById('hvReceivedGrid');
+  const resultEl = document.getElementById('hvResult');
+
+  function randomMatrix(n) {
+    return Array.from({ length: n }, () => randomBits(n));
+  }
+
+  // データ行列から (n+1)×(n+1) の送信用グリッドを作る。
+  // 末尾の列＝各行の偶数パリティ、末尾の行＝各列の偶数パリティ、
+  // 右下の角＝末尾の行（＝各列パリティ）自身の偶数パリティ。
+  function computeGrid(matrix) {
+    const n = matrix.length;
+    const grid = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(0));
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) grid[r][c] = matrix[r][c];
+    }
+    for (let r = 0; r < n; r++) {
+      const ones = grid[r].slice(0, n).reduce((a, b) => a + b, 0);
+      grid[r][n] = ones % 2 === 0 ? 0 : 1;
+    }
+    for (let c = 0; c <= n; c++) {
+      let ones = 0;
+      for (let r = 0; r < n; r++) ones += grid[r][c];
+      grid[n][c] = ones % 2 === 0 ? 0 : 1;
+    }
+    return grid;
+  }
+
+  function codewordGrid() {
+    return computeGrid(dataMatrix);
+  }
+
+  // 受け取ったグリッドについて、各行・各列の偶数パリティが崩れていないか調べる。
+  function checkGrid(grid) {
+    const n = SIZE;
+    const badRows = [];
+    const badCols = [];
+    for (let r = 0; r <= n; r++) {
+      const ones = grid[r].reduce((a, b) => a + b, 0);
+      if (ones % 2 !== 0) badRows.push(r);
+    }
+    for (let c = 0; c <= n; c++) {
+      let ones = 0;
+      for (let r = 0; r <= n; r++) ones += grid[r][c];
+      if (ones % 2 !== 0) badCols.push(c);
+    }
+    return { badRows, badCols };
+  }
+
+  function renderDataGrid() {
+    const n = SIZE;
+    dataGridEl.innerHTML = '';
+    dataGridEl.style.gridTemplateColumns = `repeat(${n}, auto)`;
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const v = dataMatrix[r][c];
+        const btn = el('button', {
+          className: 'bit',
+          text: String(v),
+          attrs: { type: 'button', 'data-value': v, 'aria-label': `${r + 1}行${c + 1}列: ${v}` },
+        });
+        btn.addEventListener('click', () => {
+          dataMatrix[r][c] = dataMatrix[r][c] ? 0 : 1;
+          renderDataGrid();
+          renderCodewordGrid();
+          resetTransmission();
+        });
+        dataGridEl.appendChild(btn);
+      }
+    }
+  }
+
+  function renderCodewordGrid() {
+    const n = SIZE;
+    const grid = codewordGrid();
+    codewordGridEl.innerHTML = '';
+    codewordGridEl.style.gridTemplateColumns = `repeat(${n + 1}, auto)`;
+    for (let r = 0; r <= n; r++) {
+      for (let c = 0; c <= n; c++) {
+        const isParityCell = r === n || c === n;
+        const cls = 'bit' + (isParityCell ? ' is-parity' : '');
+        codewordGridEl.appendChild(
+          el('div', { className: cls, text: String(grid[r][c]), attrs: { 'data-value': grid[r][c] } })
+        );
+      }
+    }
+  }
+
+  function resetTransmission() {
+    receivedGrid = codewordGrid().map((row) => row.slice());
+    renderReceivedGrid();
+    renderResult(null);
+  }
+
+  function renderReceivedGrid() {
+    const n = SIZE;
+    const original = codewordGrid();
+    const { badRows, badCols } = checkGrid(receivedGrid);
+    const located = badRows.length === 1 && badCols.length === 1 ? { r: badRows[0], c: badCols[0] } : null;
+
+    receivedGridEl.innerHTML = '';
+    receivedGridEl.style.gridTemplateColumns = `repeat(${n + 2}, auto)`;
+
+    for (let r = 0; r <= n; r++) {
+      for (let c = 0; c <= n; c++) {
+        const isParityCell = r === n || c === n;
+        const isLocated = located && located.r === r && located.c === c;
+        const v = receivedGrid[r][c];
+        const cls = ['bit'];
+        if (isParityCell) cls.push('is-parity');
+        if (v !== original[r][c]) cls.push('is-flipped');
+        if (isLocated) cls.push('is-located');
+        const btn = el('button', {
+          className: cls.join(' '),
+          text: String(v),
+          attrs: { type: 'button', 'data-value': v, 'aria-label': `受信 ${r + 1}行${c + 1}列: ${v}` },
+        });
+        btn.addEventListener('click', () => {
+          receivedGrid[r][c] = receivedGrid[r][c] ? 0 : 1;
+          renderReceivedGrid();
+          judge();
+        });
+        receivedGridEl.appendChild(btn);
+      }
+      const rowBad = badRows.includes(r);
+      receivedGridEl.appendChild(
+        el('div', { className: 'bit matrix-status ' + (rowBad ? 'is-bad' : 'is-ok'), text: rowBad ? '✗' : '✓' })
+      );
+    }
+    for (let c = 0; c <= n; c++) {
+      const colBad = badCols.includes(c);
+      receivedGridEl.appendChild(
+        el('div', { className: 'bit matrix-status ' + (colBad ? 'is-bad' : 'is-ok'), text: colBad ? '✗' : '✓' })
+      );
+    }
+    receivedGridEl.appendChild(el('div', { className: 'bit matrix-blank' }));
+  }
+
+  function judge() {
+    renderResult('judge');
+  }
+
+  function renderResult(state) {
+    const icon = resultEl.querySelector('.result-banner__icon');
+    const text = resultEl.querySelector('.result-banner__text');
+
+    if (state === null) {
+      resultEl.dataset.state = 'neutral';
+      icon.textContent = '–';
+      text.textContent = '受信データのビットをクリックすると、判定結果がここに表示されます。';
+      return;
+    }
+
+    const original = codewordGrid();
+    let flippedCount = 0;
+    for (let r = 0; r <= SIZE; r++) {
+      for (let c = 0; c <= SIZE; c++) {
+        if (receivedGrid[r][c] !== original[r][c]) flippedCount++;
+      }
+    }
+
+    if (flippedCount === 0) {
+      resultEl.dataset.state = 'ok';
+      icon.textContent = '✓';
+      text.textContent = '誤りなし：受信データはそのまま届いています。';
+      return;
+    }
+
+    const { badRows, badCols } = checkGrid(receivedGrid);
+
+    if (badRows.length === 0 && badCols.length === 0) {
+      resultEl.dataset.state = 'missed';
+      icon.textContent = '?';
+      text.textContent = `誤りを見逃しました（実際に反転したビット数：${flippedCount}）。すべての行・列のパリティがたまたま一致してしまっています。`;
+      return;
+    }
+
+    if (badRows.length === 1 && badCols.length === 1) {
+      resultEl.dataset.state = 'error-detected';
+      icon.textContent = '!';
+      text.textContent = `誤りを検出し、位置まで特定できました：${badRows[0] + 1}行目 × ${badCols[0] + 1}列目のビットです（オレンジ色のマス）。もう一度クリックすれば訂正できます。`;
+      return;
+    }
+
+    resultEl.dataset.state = 'error-detected';
+    icon.textContent = '!';
+    text.textContent = `誤りを検出しました（反転したビット数：${flippedCount}）。ただし複数の行・列で不一致が起きているため、どのビットが誤りかまでは特定できません。`;
+  }
+
+  document.getElementById('hvReset').addEventListener('click', () => {
+    dataMatrix = randomMatrix(SIZE);
+    renderDataGrid();
+    renderCodewordGrid();
+    resetTransmission();
+  });
+
+  document.getElementById('hvRectangleDemo').addEventListener('click', () => {
+    const pick2 = () => {
+      const pool = [0, 1, 2, 3];
+      const i1 = Math.floor(Math.random() * pool.length);
+      const v1 = pool.splice(i1, 1)[0];
+      const i2 = Math.floor(Math.random() * pool.length);
+      const v2 = pool.splice(i2, 1)[0];
+      return [v1, v2];
+    };
+    const [r1, r2] = pick2();
+    const [c1, c2] = pick2();
+    [[r1, c1], [r1, c2], [r2, c1], [r2, c2]].forEach(([r, c]) => {
+      receivedGrid[r][c] ^= 1;
+    });
+    renderReceivedGrid();
+    judge();
+  });
+
+  renderDataGrid();
+  renderCodewordGrid();
+  resetTransmission();
+}
+
+/* ============================================================
+   3. チェックサム
    ============================================================ */
 
 function initChecksum() {
@@ -391,7 +622,7 @@ function initChecksum() {
 }
 
 /* ============================================================
-   3. CRC（巡回冗長検査）
+   4. CRC（巡回冗長検査）
    ============================================================ */
 
 const CRC_GENERATORS = [
@@ -658,6 +889,28 @@ const QUIZ_QUESTIONS = [
     explain: '偶数個のビットが反転すると1の個数の偶奇は元通りになるため、パリティチェックでは検出できません。',
   },
   {
+    q: '水平垂直パリティ（2次元パリティ）が、単純なパリティチェックより優れている点はどれですか。',
+    options: [
+      '1ビットの誤りであれば、その場所を特定して訂正できる場合がある',
+      '計算がまったく不要になる',
+      'どんな誤りでも100%検出できる',
+      '送るデータの量を減らせる',
+    ],
+    correct: 0,
+    explain: '行と列の両方でパリティを調べることで、不一致になった行と列の交点から誤りビットの位置を特定できる場合があります。',
+  },
+  {
+    q: '水平垂直パリティが誤りを完全に見逃してしまうのはどのような場合ですか。',
+    options: [
+      '1ビットだけが反転した場合',
+      '表の中の長方形の4つの角にあたる4ビットが同時に反転した場合',
+      '誤りが1つも起きなかった場合',
+      '水平垂直パリティは絶対に見逃さない',
+    ],
+    correct: 1,
+    explain: '長方形の4隅が同時に反転すると、関係する各行・各列でちょうど2ビットずつ変化するため、すべての行・列のパリティチェックが一致してしまい見逃します。',
+  },
+  {
     q: 'チェックサムの基本的な考え方として正しいものはどれですか。',
     options: [
       'データを暗号化して送る',
@@ -793,6 +1046,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   initIntro();
   initParity();
+  initHVParity();
   initChecksum();
   initCrc();
   initQuiz();

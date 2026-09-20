@@ -348,6 +348,12 @@ button.bit:hover {
   color: #2a0d08 !important;
 }
 
+.bit.is-located {
+  background: var(--warn) !important;
+  color: #2a1400 !important;
+  box-shadow: 0 0 0 2px #ffdca0;
+}
+
 .signal-panel {
   background: var(--panel-dark);
   border-radius: var(--radius-m);
@@ -520,6 +526,31 @@ button.bit:hover {
   color: #8a520d;
 }
 .result-banner[data-state="missed"] .result-banner__icon { background: var(--warn); color: #fff; }
+
+/* ============ 水平垂直パリティ（マトリクス） ============ */
+
+.matrix {
+  display: grid;
+  gap: 6px;
+}
+
+.bit.matrix-status {
+  font-size: 1rem;
+  cursor: default;
+}
+.bit.matrix-status.is-ok {
+  background: #16233f;
+  color: var(--good);
+}
+.bit.matrix-status.is-bad {
+  background: #2a1420;
+  color: var(--bit-flipped);
+}
+
+.bit.matrix-blank {
+  background: transparent !important;
+  box-shadow: none !important;
+}
 
 /* ============ checksum blocks ============ */
 
