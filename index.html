@@ -1,1 +1,309 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>誤り検出符号を学ぼう | パリティ・チェックサム・CRC</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📡</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
 
+<a class="skip-link" href="#main">本文へスキップ</a>
+
+<header class="site-header">
+  <div class="header-inner">
+    <p class="site-title">
+      <span class="site-title__icon" aria-hidden="true">📡</span>
+      通信の誤り検出符号を学ぼう
+    </p>
+    <p class="site-subtitle">ノイズだらけの回線で、コンピュータはどうやって「データが壊れていない」と確かめるのか</p>
+  </div>
+  <nav class="tab-nav" aria-label="学習セクション">
+    <button class="tab-btn is-active" data-tab="intro">はじめに</button>
+    <button class="tab-btn" data-tab="parity">1. パリティチェック</button>
+    <button class="tab-btn" data-tab="checksum">2. チェックサム</button>
+    <button class="tab-btn" data-tab="crc">3. 巡回冗長検査(CRC)</button>
+    <button class="tab-btn" data-tab="quiz">まとめクイズ</button>
+  </nav>
+</header>
+
+<main id="main">
+
+  <!-- ============ はじめに ============ -->
+  <section class="panel is-active" id="intro" data-section>
+    <h2 class="panel-title">なぜ「誤り検出」が必要なのか</h2>
+    <p class="lead">
+      Wi-Fiや光ファイバー、USBケーブル……データはすべて0と1の電気信号や光の点滅として送られます。
+      ところが現実の回線にはノイズ（雑音）があり、送ったつもりの「1」が「0」に化けてしまうことがあります。
+    </p>
+
+    <div class="signal-diagram" aria-hidden="true">
+      <div class="signal-node">
+        <span class="signal-node__label">送信側</span>
+        <div class="signal-bits" id="introSenderBits"></div>
+      </div>
+      <div class="signal-path">
+        <div class="signal-path__line"></div>
+        <span class="signal-path__noise">⚡ ノイズ</span>
+      </div>
+      <div class="signal-node">
+        <span class="signal-node__label">受信側</span>
+        <div class="signal-bits" id="introReceiverBits"></div>
+      </div>
+    </div>
+    <button class="btn btn-secondary" id="introNoiseBtn" type="button">ノイズを1回起こしてみる</button>
+
+    <p>
+      受信側は、送られてきたビット列を見ただけでは「これは正しいデータなのか、それとも壊れているのか」を判断できません。
+      そこで登場するのが<strong>誤り検出符号</strong>です。送信側があらかじめ元のデータに「チェック用の情報」を付け加えておき、
+      受信側はそれを使って矛盾がないかを確認します。
+    </p>
+
+    <div class="callout callout-idea">
+      <p class="callout-title">この教材で学ぶ3つの方式</p>
+      <ul>
+        <li><strong>パリティチェック</strong> — 1の個数の偶奇だけを見る、もっとも単純な方法</li>
+        <li><strong>チェックサム</strong> — データを数値の塊とみなして合計値を検査する方法</li>
+        <li><strong>巡回冗長検査（CRC）</strong> — 割り算の余りを使う、実際の通信でも広く使われている方法</li>
+      </ul>
+    </div>
+    <button class="btn btn-primary" data-goto="parity" type="button">パリティチェックから始める →</button>
+  </section>
+
+  <!-- ============ 1. パリティチェック ============ -->
+  <section class="panel" id="parity" data-section>
+    <p class="eyebrow">Step 1</p>
+    <h2 class="panel-title">パリティチェック</h2>
+    <p class="lead">
+      送るデータの中にある「1」の個数を数え、それが偶数個になるように（または奇数個になるように）調整用のビットを1つ付け加える方法です。
+    </p>
+
+    <h3 class="sub-title">仕組み</h3>
+    <p>
+      たとえば「偶数パリティ」を使う場合、データの中の1の個数が偶数ならパリティビットは0、奇数ならパリティビットは1にします。
+      こうすると、パリティビットを含めた全体では、1の個数が必ず偶数になります。受信側は届いたビット列の1の個数を数え、
+      偶数でなければ「途中で誤りが起きた」と分かります。
+    </p>
+
+    <div class="widget" id="parityWidget">
+      <div class="widget-row">
+        <span class="widget-label">1. データビット（クリックで0/1を切り替え）</span>
+        <div class="bit-row" id="parityDataBits"></div>
+      </div>
+
+      <div class="widget-row">
+        <span class="widget-label">2. パリティ方式</span>
+        <div class="segmented" role="radiogroup" aria-label="パリティ方式">
+          <button class="segmented__btn is-active" data-parity-mode="even" type="button">偶数パリティ</button>
+          <button class="segmented__btn" data-parity-mode="odd" type="button">奇数パリティ</button>
+        </div>
+      </div>
+
+      <div class="widget-row">
+        <span class="widget-label">3. 送信コードワード（データ + パリティビット）</span>
+        <div class="signal-panel">
+          <div class="bit-row bit-row--readout" id="parityCodeword"></div>
+          <p class="signal-panel__note" id="parityExplain"></p>
+        </div>
+      </div>
+
+      <div class="widget-row">
+        <span class="widget-label">4. 受信データ（クリックしてノイズによるビット反転を再現）</span>
+        <div class="signal-panel">
+          <div class="bit-row" id="parityReceivedBits"></div>
+          <p class="signal-panel__hint">受信データのビットをクリックすると、そのビットが反転します（回線ノイズの再現）。</p>
+        </div>
+      </div>
+
+      <div class="result-banner" id="parityResult" data-state="neutral">
+        <span class="result-banner__icon" aria-hidden="true">–</span>
+        <span class="result-banner__text">受信データのビットをクリックすると、判定結果がここに表示されます。</span>
+      </div>
+
+      <div class="widget-actions">
+        <button class="btn btn-secondary" id="parityReset" type="button">データを引き直す</button>
+        <button class="btn btn-secondary" id="parityFlipTwo" type="button">2ビット同時に反転させてみる</button>
+      </div>
+    </div>
+
+    <div class="callout callout-warn">
+      <p class="callout-title">パリティチェックの弱点</p>
+      <p>
+        「2ビット同時に反転させてみる」ボタンを押してみましょう。2つのビットが反転すると、1の個数の偶奇は元に戻ってしまい、
+        受信側は誤りに気づけません。パリティチェックは<strong>奇数個のビット誤りはほぼ検出できますが、偶数個のビット誤りは見逃してしまう</strong>という弱点があります。
+      </p>
+    </div>
+
+    <div class="section-nav">
+      <button class="btn btn-primary" data-goto="checksum" type="button">次へ：チェックサム →</button>
+    </div>
+  </section>
+
+  <!-- ============ 2. チェックサム ============ -->
+  <section class="panel" id="checksum" data-section>
+    <p class="eyebrow">Step 2</p>
+    <h2 class="panel-title">チェックサム</h2>
+    <p class="lead">
+      データを一定のサイズ（ここでは8ビット＝0〜255の数値）ごとのブロックに分け、その合計値から検査用の数値「チェックサム」を作る方法です。
+      パリティチェックが1ビット単位だったのに対し、チェックサムはブロック（数バイト）単位で誤りを検出できます。
+    </p>
+
+    <h3 class="sub-title">仕組み</h3>
+    <p>
+      送信側はすべてのブロックの合計を256で割った余りを求め、その余りを256から引いた値（＝合計がちょうど256の倍数になるように帳尻を合わせる数）をチェックサムとして末尾に付け加えます。
+      受信側はブロックとチェックサムを全部足し、256で割り切れれば「誤りなし」と判断します。
+    </p>
+
+    <div class="widget" id="checksumWidget">
+      <div class="widget-row">
+        <span class="widget-label">1. データブロック（0〜255の数値を4つ。クリックすると値が変化します）</span>
+        <div class="block-row" id="checksumBlocks"></div>
+      </div>
+
+      <div class="widget-row">
+        <span class="widget-label">2. 送信側の計算</span>
+        <div class="signal-panel">
+          <p class="calc-line" id="checksumCalcSum"></p>
+          <p class="calc-line" id="checksumCalcValue"></p>
+          <div class="block-row block-row--readout" id="checksumSendBlocks"></div>
+        </div>
+      </div>
+
+      <div class="widget-row">
+        <span class="widget-label">3. 受信側で検証</span>
+        <div class="signal-panel">
+          <p class="signal-panel__hint">受信ブロックの数値をクリックすると、通信ノイズによってその値が少し変化します。</p>
+          <div class="block-row" id="checksumReceivedBlocks"></div>
+          <p class="calc-line" id="checksumVerifySum"></p>
+        </div>
+      </div>
+
+      <div class="result-banner" id="checksumResult" data-state="neutral">
+        <span class="result-banner__icon" aria-hidden="true">–</span>
+        <span class="result-banner__text">受信ブロックの数値をクリックすると、判定結果がここに表示されます。</span>
+      </div>
+
+      <div class="widget-actions">
+        <button class="btn btn-secondary" id="checksumReset" type="button">データを引き直す</button>
+        <button class="btn btn-secondary" id="checksumCancelDemo" type="button">誤りが打ち消し合う例を見る</button>
+      </div>
+    </div>
+
+    <div class="callout callout-warn">
+      <p class="callout-title">チェックサムの弱点</p>
+      <p>
+        「誤りが打ち消し合う例を見る」ボタンを押すと、一方のブロックが+1、別のブロックが−1変化する例を再現します。
+        このとき合計値は変わらないため、チェックサムは誤りを見逃します。チェックサムは<strong>合計値さえ一致すれば通過してしまう</strong>ため、
+        ビットの並び替えや、増減が打ち消し合うタイプの誤りには弱いという特徴があります。
+      </p>
+    </div>
+
+    <div class="section-nav">
+      <button class="btn btn-primary" data-goto="crc" type="button">次へ：CRC →</button>
+    </div>
+  </section>
+
+  <!-- ============ 3. CRC ============ -->
+  <section class="panel" id="crc" data-section>
+    <p class="eyebrow">Step 3</p>
+    <h2 class="panel-title">巡回冗長検査（CRC）</h2>
+    <p class="lead">
+      CRCは、データのビット列を1つの大きな2進数とみなし、あらかじめ決めておいた「生成多項式（割る数）」で割り算をして、
+      その<strong>余り</strong>を検査用のビットとして使う方法です。Ethernetや無線LAN、ZIPファイルなど、実際の通信や記録媒体で広く使われています。
+    </p>
+
+    <h3 class="sub-title">仕組み</h3>
+    <p>
+      ふつうの割り算とは少し違い、CRCでは引き算の代わりに「XOR（排他的論理和）」を使います。XORは同じビット同士なら0、異なるビット同士なら1になる計算です。
+      データの右側に、生成多項式の桁数より1桁少ない分だけ0を付け足してから、生成多項式で割り算のように何度もXORを繰り返し、最後に余ったビットが「CRC符号」になります。
+    </p>
+
+    <div class="widget" id="crcWidget">
+      <div class="widget-row">
+        <span class="widget-label">1. データビット（クリックで0/1を切り替え）</span>
+        <div class="bit-row" id="crcDataBits"></div>
+      </div>
+
+      <div class="widget-row">
+        <span class="widget-label">2. 生成多項式（割る数）</span>
+        <div class="segmented segmented--wrap" role="radiogroup" aria-label="生成多項式" id="crcGeneratorGroup"></div>
+      </div>
+
+      <div class="widget-row">
+        <button class="btn btn-secondary btn-small" id="crcToggleSteps" type="button" aria-expanded="false">
+          計算過程（XOR割り算）を表示する ▾
+        </button>
+        <div class="crc-steps" id="crcSteps" hidden></div>
+      </div>
+
+      <div class="widget-row">
+        <span class="widget-label">3. 送信コードワード（データ + CRC符号）</span>
+        <div class="signal-panel">
+          <div class="bit-row bit-row--readout" id="crcCodeword"></div>
+          <p class="signal-panel__note" id="crcRemainderNote"></p>
+        </div>
+      </div>
+
+      <div class="widget-row">
+        <span class="widget-label">4. 受信データ（クリックしてビット誤りを再現）</span>
+        <div class="signal-panel">
+          <div class="bit-row" id="crcReceivedBits"></div>
+          <p class="signal-panel__hint">受信コードワードのビットをクリックすると、そのビットが反転します。</p>
+        </div>
+      </div>
+
+      <div class="result-banner" id="crcResult" data-state="neutral">
+        <span class="result-banner__icon" aria-hidden="true">–</span>
+        <span class="result-banner__text">受信データのビットをクリックすると、判定結果がここに表示されます。</span>
+      </div>
+
+      <div class="widget-actions">
+        <button class="btn btn-secondary" id="crcReset" type="button">データを引き直す</button>
+      </div>
+    </div>
+
+    <div class="callout callout-idea">
+      <p class="callout-title">CRCが強力な理由</p>
+      <p>
+        CRCは割り算の性質上、連続したビットの誤り（バースト誤り）や、パリティやチェックサムでは見逃しやすい誤りのパターンも高い確率で検出できます。
+        そのため通信の世界では、パリティチェックやチェックサムよりも信頼性の高い方式として広く採用されています。
+      </p>
+    </div>
+
+    <div class="section-nav">
+      <button class="btn btn-primary" data-goto="quiz" type="button">次へ：まとめクイズ →</button>
+    </div>
+  </section>
+
+  <!-- ============ まとめクイズ ============ -->
+  <section class="panel" id="quiz" data-section>
+    <p class="eyebrow">Check</p>
+    <h2 class="panel-title">まとめクイズ</h2>
+    <p class="lead">3つの方式について、理解を確認しましょう。全問に答えたら「採点する」を押してください。</p>
+
+    <form id="quizForm" class="quiz-list"></form>
+
+    <div class="widget-actions">
+      <button class="btn btn-primary" id="quizSubmit" type="button">採点する</button>
+      <button class="btn btn-secondary" id="quizRetry" type="button" hidden>もう一度挑戦する</button>
+    </div>
+
+    <div class="result-banner" id="quizScore" data-state="neutral" hidden>
+      <span class="result-banner__icon" aria-hidden="true">–</span>
+      <span class="result-banner__text"></span>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <p>高校1年生向け 情報の授業教材 ／ パリティチェック・チェックサム・CRCの体系的な学習用アプリケーション</p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
